@@ -72,5 +72,45 @@ fn handle_client<T: Read + Write>(mut stream: T, root_path: &str, reload: bool, 
         }
     };
 
-    if let Ok(mut file_contents) = file_contents {}
+    if let Ok(mut file_contents) = file_contents {
+        // bind file extension to MIME type
+        let content_type = extension_to_mime_impl(extension);
+
+        #[allow(unused_mut)]
+        let mut content_length = file_contents.len();
+
+        // Prepare to inject code into HTML if reload is enabled
+        #[cfg(feature = "reload")]
+        let reload_append = include_bytes!("./reload.html");
+
+        #[cfg(feature = "reload")]
+        {
+            if extension == Some("html") && reload {
+                content_length += reload_append.len();
+            }
+        }
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-type: {}\r\nContent-Length: {}{}\r\n\r\n",
+            content_type, content_length, headers
+        );
+
+        let mut bytes = response.as_bytes().to_vec();
+        bytes.append(&mut file_contents);
+        stream.write_all(&bytes).unwrap();
+
+        #[cfg(feature = "reload")]
+        {
+            if extension == Some("html") && reload {
+                stream.write_all(reload_append).unwrap();
+            }
+        }
+
+        stream.flush().unwrap();
+    } else {
+        println!("Could not find file: {}", path.to_str().unwrap());
+        let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n";
+        stream.write_all(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+    }
 }

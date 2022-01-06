@@ -1,8 +1,14 @@
 [package]
-name = "hakuna"
-version = "0.1.0"
+author = ["Gustavo Cavalcante <nowayhecodes@gmail.com>"]
+categories = ["command-line-utilities", "development-tools", "web-programming::http-server"]
+description = "A simple dev server in Rust."
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["web", "server", "https", "http"]
+license = "MIT"
+name = "hakuna"
+readme = "README.md"
+repository = "https://github.com/nowayhecodes/hakuna"
+version = "1.0.0"
 
 [dependencies]
+hakuna_lib = {path = "hakuna_lib", version = "1.0.0", features = ["reload", "https"]}

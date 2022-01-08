@@ -36,3 +36,9 @@ fn parse_ws_handshake(bytes: &[u8]) -> String {
     format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",bytes);
 }
 
+fn handle_ws_handshake<T: Read + Write>(mut stream: T) {
+    let header = crate::read_header(&mut stream);
+    let response = parse_ws_handshake(&header);
+    stream.write_all(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
+}

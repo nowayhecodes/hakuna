@@ -114,3 +114,64 @@ fn handle_client<T: Read + Write>(mut stream: T, root_path: &str, reload: bool, 
         stream.flush().unwrap();
     }
 }
+
+pub fn run(address: &str, port: u32, path: &str, reload: bool, headers: &str) {
+    #[cfg(feature = "https")]
+    let acceptor = {
+        let bytes = include_bytes!("./identity.pfx");
+        let identity = Identity::from_pkcs12(bytes, "debug").unwrap();
+
+        Arc::new(TlsAcceptor::new(identity).unwrap())
+    };
+
+    #[cfg(feature = "reload")]
+    {
+        if reload {
+            let address = address.to_owned();
+            let path = path.to_owned();
+
+            thread::spawn(move || {
+                reload::watch_for_reloads(&address, &path);
+            });
+        }
+    }
+
+    let address_with_port = format!("{}:{:?}", address, port);
+    let listener = TcpListener::bind(address_with_port).unwrap();
+
+    for stream in listener.incoming() {
+        if let Ok(stream) = stream {
+            #[cfg(feature = "https")]
+            let acceptor = acceptor.clone();
+            let path = path.to_owned();
+            let headers = headers.to_owned();
+
+            thread::spawn(move || {
+                let mut buf = [0; 2];
+                stream.peek(&mut buf).expect("peek failed");
+
+                #[cfg(feature = "https")]
+                let is_https =
+                    !((buf[0] as char).is_alphabetic() && (buf[1] as char).is_alphabetic());
+
+                #[cfg(not(feature = "https"))]
+                let is_https = false;
+
+                if is_https {
+                    #[cfg(feature = "https")]
+                    if let Ok(stream) = acceptor.accept(stream) {
+                        handle_client(stream, &path, reload, &headers);
+                    }
+                } else {
+                    handle_client(stream, &path, reload, &headers);
+                }
+            });
+        }
+    }
+}
+
+fn extension_to_mime_impl(ext: Option<&str>) -> &'static str {
+    match ext {
+        _ => "application/octet-stream"
+    }
+}

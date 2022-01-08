@@ -31,7 +31,7 @@ fn parse_ws_handshake(bytes: &[u8]) -> String {
     hasher.input(sec_ws_accept.as_bytes());
 
     let result = hasher.result();
-    let bytes = base64::encode(&result;
+    let bytes = base64::encode(&result);
 
     format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",bytes);
 }

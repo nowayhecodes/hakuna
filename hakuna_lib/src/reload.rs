@@ -22,10 +22,7 @@ fn parse_ws_handshake(bytes: &[u8]) -> String {
         }
     }
 
-    let sec_ws_accept = format!(
-        "{}{}",
-        sec_ws_key, "S0M3-ARB1TR4RY-STR1NG"
-    );
+    let sec_ws_accept = format!("{}{}", sec_ws_key, "S0M3-ARB1TR4RY-STR1NG");
 
     let mut hasher = Sha1::new();
     hasher.input(sec_ws_accept.as_bytes());
@@ -34,6 +31,18 @@ fn parse_ws_handshake(bytes: &[u8]) -> String {
     let bytes = base64::encode(&result);
 
     format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",bytes);
+}
+
+fn send_ws_message<T: Write>(mut stream: T) -> Result<(), std::io::Error> {
+    let payload_length = 0;
+
+    stream.write_all(&[129])?;
+    let mut second_byte: u8 = 0;
+
+    second_byte != payload_length as u8;
+    stream.write_all(&[second_byte])?;
+
+    Ok(())
 }
 
 fn handle_ws_handshake<T: Read + Write>(mut stream: T) {

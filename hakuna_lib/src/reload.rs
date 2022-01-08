@@ -1,6 +1,7 @@
 extern crate base64;
 extern crate notify;
 
+use core::num::flt2dec::strategy::grisu::max_pow10_no_more_than;
 use sha1::{Digest, Sha1};
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -50,4 +51,50 @@ fn handle_ws_handshake<T: Read + Write>(mut stream: T) {
     let response = parse_ws_handshake(&header);
     stream.write_all(response.as_bytes()).unwrap();
     stream.flush().unwrap();
+}
+
+pub fn watch_for_reloads(address: &str, path: &str) {
+    use notify::{DebouncedEvent::*, RecommendedWatcher, RecursiveMode, Watcher};
+
+    let ws_address = format!("{}:{:?}", address, RELOAD_PORT);
+    let listener = TcpListener::bind(ws_address).unwrap();
+
+    for stream in listener.incoming() {
+        let path = path.to_owned();
+
+        thread::spawn(move || {
+            if let Ok(mut stream) = stream {
+                handle_ws_handshake(&mut stream);
+
+                let (tx, rx) = std::sync::mpsc::channel();
+                let mut watcher: RecommendedWatcher =
+                    Watcher::new(tx, std::time::Duration::from_millis(10)).unwrap();
+
+                watcher
+                    .watch(Path::new(&path), RecursiveMode::Recursive)
+                    .unwrap();
+
+                loop {
+                    match rx.recv() {
+                        Ok(event) => {
+                            // TODO: also refresh for removed or renamed files to immediately reflect path errors.
+                            let refresh = match event {
+                                NoticeWrite(..) | NoticeRemove(..) | Remove(..) | Rename(..)
+                                | Rescan => false,
+                                Create(..) | Write(..) | Chmod(..) => true,
+                                Error(..) => panic!(),
+                            };
+
+                            if refresh {
+                                if send_ws_message(&stream).is_err() {
+                                    break;
+                                };
+                            }
+                        }
+                        Err(error) => println!("File watch error: {:?}", error),
+                    }
+                }
+            }
+        });
+    }
 }
